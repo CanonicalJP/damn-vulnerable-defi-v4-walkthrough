@@ -154,7 +154,7 @@ contract TheRewarderChallenge is Test {
         bytes32[] memory dvtLeaves = _loadRewards("/test/the-rewarder/dvt-distribution.json");
         bytes32[] memory wethLeaves = _loadRewards("/test/the-rewarder/weth-distribution.json");
 
-        uint dvtTxCount = TOTAL_DVT_DISTRIBUTION_AMOUNT /  PLAYER_DVT_CLAIM_AMOUNT;
+        uint dvtTxCount = TOTAL_DVT_DISTRIBUTION_AMOUNT / PLAYER_DVT_CLAIM_AMOUNT;
         uint wethTxCount = TOTAL_WETH_DISTRIBUTION_AMOUNT / PLAYER_WETH_CLAIM_AMOUNT;
         uint totalTxCount = dvtTxCount + wethTxCount;
 
@@ -178,7 +178,7 @@ contract TheRewarderChallenge is Test {
                     batchNumber: 0, // claim corresponds to first DVT batch
                     amount: PLAYER_WETH_CLAIM_AMOUNT,
                     tokenIndex: 1, // claim corresponds to first token in `tokensToClaim` array
-                    proof: merkle.getProof(wethLeaves, 188)  //player at index 188
+                    proof: merkle.getProof(wethLeaves, 188) //player at index 188
                 });
             }
         }
@@ -217,8 +217,10 @@ contract TheRewarderChallenge is Test {
 
     // Utility function to read rewards file and load it into an array of leaves
     function _loadRewards(string memory path) private view returns (bytes32[] memory leaves) {
-        Reward[] memory rewards =
-            abi.decode(vm.parseJson(vm.readFile(string.concat(vm.projectRoot(), path))), (Reward[]));
+        Reward[] memory rewards = abi.decode(
+            vm.parseJson(vm.readFile(string.concat(vm.projectRoot(), path))),
+            (Reward[])
+        );
         assertEq(rewards.length, BENEFICIARIES_AMOUNT);
 
         leaves = new bytes32[](BENEFICIARIES_AMOUNT);
