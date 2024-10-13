@@ -391,7 +391,7 @@ Run `forge test --mp test/compromised/Compromised.t.sol --isolate` to validate t
 
 _from `_isSolved()`in test_
 
-1. _Player executed a single transaction_ **CAN'T BE MEET**
+1. _Player executed a single transaction_ **UNACHIEVABLE?**
 2. _All tokens of the lending pool were deposited into the recovery account_
 
 ### Attack Analysis
