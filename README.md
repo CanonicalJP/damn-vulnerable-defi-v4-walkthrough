@@ -24,7 +24,7 @@ function test_unstoppable() public checkSolvedByPlayer {
 }
 ```
 
-Run `forge test --mc UnstoppableChallenge` to validate test
+Run `forge test --mp test/unstoppable/Unstoppable.t.sol --isolate` to validate test
 
 ---
 
@@ -76,7 +76,7 @@ See [test/naive-receiver/NaiveReceiver.t.sol](https://github.com/CanonicalJP/dam
     }
 ```
 
-Run `forge test --mc NaiveReceiverChallenge` to validate test
+Run `forge test --mp test/naive-receiver/NaiveReceiver.t.sol --isolate` to validate test
 
 ---
 
@@ -96,7 +96,7 @@ _from `_isSolved()`in test_
 
 ### POC
 
-See [test/naive-receiver/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/Truster.t.sol)
+See [test/truster/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/truster/Truster.t.sol)
 
 ```solidity
 function test_truster() public checkSolvedByPlayer {
@@ -114,7 +114,7 @@ contract AttackTruster {
 }
 ```
 
-Run `forge test --mc TrusterChallenge` to validate test
+Run `forge test --mp test/truster/Truster.t.sol --isolate` to validate test
 
 ---
 
@@ -162,7 +162,7 @@ contract Attack {
 }
 ```
 
-Run `forge test --mc SideEntranceChallenge` to validate test
+Run `forge test --mp test/side-entrance/SideEntrance.t.sol --isolate` to validate test
 
 ---
 
@@ -231,7 +231,7 @@ function test_theRewarder() public checkSolvedByPlayer {
 }
 ```
 
-Run `forge test --mc TheRewarderChallenge` to validate test
+Run `forge test --mp test/the-rewarder/TheRewarder.t.sol --isolate` to validate test
 
 ---
 
@@ -253,7 +253,7 @@ _from `_isSolved()`in test_
 
 ### POC
 
-See [test/the-rewarder/Selfie.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/selfie/Selfie.t.sol)
+See [test/selfie/Selfie.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/selfie/Selfie.t.sol)
 
 ```solidity
 function test_selfie() public checkSolvedByPlayer {
@@ -295,7 +295,7 @@ contract Attack is IERC3156FlashBorrower {
 }
 ```
 
-Run `forge test --mc SelfieChallenge` to validate test
+Run `forge test --mp test/selfie/Selfie.t.sol --isolate` to validate test
 
 ---
 
@@ -381,7 +381,7 @@ contract Attack {
 }
 ```
 
-Run `forge test --mc CompromisedChallenge` to validate test
+Run `forge test --mp test/compromised/Compromised.t.sol --isolate` to validate test
 
 ---
 
@@ -433,6 +433,6 @@ contract Attack {
 }
 ```
 
-Run `forge test --mp test/puppet/Puppet.t.sol` to validate test
+Run `forge test --mp test/puppet/Puppet.t.sol --isolate` to validate test
 
 ---
