@@ -447,7 +447,7 @@ _from `_isSolved()`in test_
 
 ### Attack Analysis
 
-- The implementation is still vulnerable becuase pool gets the price from a pool and it can still manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
+- The implementation is still vulnerable becuase the lending pool gets the price from a Uniswap pari and it can still be manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
 - An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
 - Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
 
