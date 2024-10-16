@@ -4,17 +4,17 @@
 
 Starting with 10 DVT tokens in balance, show that it’s possible to halt the vault. It must stop offering flash loans. _See [challenges/unstoppable/](https://www.damnvulnerabledefi.xyz/challenges/unstoppable/)_
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _Flashloan check must fail_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The balance of `UnstoppableVault` is not accounted for unexpected changes (e.g. force feeding ERC20 tokens), by just transfering a small amount to the vault, the below condition fail and revert
 
-### POC
+**POC**
 
 See [test/unstoppable/Unstoppable.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/unstoppable/Unstoppable.t.sol)
 
@@ -30,7 +30,7 @@ Run `forge test --mp test/unstoppable/Unstoppable.t.sol --isolate` to validate t
 
 ## 2.NAIVE RECEIVER
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
@@ -39,13 +39,13 @@ _from `_isSolved()`in test_
 3. _Pool is empty too_
 4. _All funds sent to recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The vulnerability is that the `onFlashLoan` function in `FlashLoanReceiver` doesn't verify the authorization of the flash loan's origin. By executing 10 flash loans with an amount of 0, we can deplete the FlashLoanReceiver's 10 ETH. However, the constraint is that the Nonce must be under 2. Since `NaiveReceiverPool` supports `Multicall`, we can leverage it to conduct all 10 flash loan operations in a single transaction, thereby meeting the Nonce requirement.
 - The next step is to extract the initial 1000 ETH from the NaiveReceiverPool. The only way to transfer assets is through the `withdraw` function. For this function to execute, `_msgSender` must meet the conditions where `msg.sender` equals `trustedForwarder` and `msg.data.length` is at least 20 bytes, which leaves room for tampering.
 - Lastly, using a forwarder to execute a meta-transaction, the `msg.sender == trustedForwarder` condition can be met.
 
-### POC
+**POC**
 
 See [test/naive-receiver/NaiveReceiver.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/naive-receiver/NaiveReceiver.t.sol)
 
@@ -82,19 +82,19 @@ Run `forge test --mp test/naive-receiver/NaiveReceiver.t.sol --isolate` to valid
 
 ## 3.TRUSTER
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _Player must have executed a single transaction_
 2. _All rescued funds sent to recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The vulnerability resides in `flashLoan()` in `TrusterLenderPool`, which includes a call to an arbitrary address with arbitrary data, `target.functionCall(data)`. We can use it to call the token and `approve()` the contract we want to later call the token and do a `transferFrom`.
 - Lastly, we need to execute the attack in one ATOMIC transaction. To complete this objective, the best approach is to execute the code in the `constructor()` of a contract.
 
-### POC
+**POC**
 
 See [test/truster/Truster.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/truster/Truster.t.sol)
 
@@ -120,17 +120,17 @@ Run `forge test --mp test/truster/Truster.t.sol --isolate` to validate test
 
 ## 4.SIDE ENTRANCE
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _All rescued funds sent to recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The attack can be executed by asking a flahs loan through `flashLoan()`and then depositing the total value in the same call using `deposit()`.
 
-### POC
+**POC**
 
 See [test/side-entrance/SideEntrance.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/side-entrance/SideEntrance.t.sol)
 
@@ -168,21 +168,21 @@ Run `forge test --mp test/side-entrance/SideEntrance.t.sol --isolate` to validat
 
 ## 5.THE REWARDER
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _Player saved as much funds as possible, perhaps leaving some dust_
 2. _All funds sent to the designated recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The vulnerability exists in the `claimRewards()` function, which processes multiple claims in a single transaction.
 - The function transfers rewards for each claim iteration but only marks claims as processed after the final occurrence by calling `_setClaimed()`. This allows malicious actors to submit multiple identical claims, receiving multiple payouts before the system recognizes the claim as processed.
 - The exploit requires the attacker to have at least one valid, unclaimed reward and sufficient contract funds for multiple payouts.
 - The attack involves creating an array of identical claim objects, calling `claimRewards()` with this array, and immediately withdrawing the exploited funds.
 
-### POC
+**POC**
 
 See [test/the-rewarder/TheRewarder.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/the-rewarder/TheRewarder.t.sol)
 
@@ -237,13 +237,13 @@ Run `forge test --mp test/the-rewarder/TheRewarder.t.sol --isolate` to validate 
 
 ## 6.SELFIE
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _Player has taken all tokens from the pool_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The vulnerability is associated with how the voting power should be accounted to prevent an attacker from queue actions while doing a flahs loan.
 - First, the attacker needs to ask a flash loan to `SelfiePool.flashLoan()` and receive the tokens in a contract implementing `IERC3156FlashBorrower`. To add an action in the queue, it's needed to have more than half of the supply of the `DamnValuableVotes` token. See `SimpleGovernance._hasEnoughVotes()`.
@@ -251,7 +251,7 @@ _from `_isSolved()`in test_
 - Then, in the same function, the attacker has to queue an action to call `SelfiePool.emergencyExit()` using the address of the `recovery`.
 - Finally, the attacker must wait for at least to days and call `SimpleGovernance.executeAction()`.
 
-### POC
+**POC**
 
 See [test/selfie/Selfie.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/selfie/Selfie.t.sol)
 
@@ -301,7 +301,7 @@ Run `forge test --mp test/selfie/Selfie.t.sol --isolate` to validate test
 
 ## 7.COMPROMISED
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
@@ -310,7 +310,7 @@ _from `_isSolved()`in test_
 3. _Player must not own any NFT_
 4. _NFT price didn't change_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The contracts do not present any flaw that could be used to drain the exchange liquidity. Thus, better to start by analysing the leaked data from the server.
 - Because of the context, it's safe to assume that they could potentially be private keys.
@@ -318,7 +318,7 @@ _from `_isSolved()`in test_
 - The final result obtained could be a private key. To validate it, let's use [rfctools](https://www.rfctools.com/ethereum-address-test-tool/). Now, we can see that they are private keys to `source[0]` and `source[1]`, both used for price feeds functionalities, see [test/compromised/Compromised.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/b99a51c7056487472824550e0764b4aa390bb4ae/test/compromised/Compromised.t.sol#L24-L28)
 - Having access to the private keys of these sources, and attacker could manipulate the price of the token to buy low and sell high. Effectively draining liquidity from the exchange.
 
-### POC
+**POC**
 
 See [test/compromised/Compromised.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4/blob/master/test/compromised/Compromised.t.sol)
 
@@ -387,20 +387,20 @@ Run `forge test --mp test/compromised/Compromised.t.sol --isolate` to validate t
 
 ## 8.PUPPET
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _Player executed a single transaction_ `UNACHIEVABLE?`
 2. _All tokens of the lending pool were deposited into the recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The vulnerability relays in that the contract uses balances of ETH and DVT to compute the prices, see `_computeOraclePrice()`.
 - An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
 - Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
 
-### POC
+**POC**
 
 See [test/puppet/Puppet.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet/Puppet.t.sol)
 
@@ -439,19 +439,19 @@ Run `forge test --mp test/puppet/Puppet.t.sol --isolate` to validate test
 
 ## 9.PUPPET V2
 
-### Objective
+**Objective**
 
 _from `_isSolved()`in test_
 
 1. _All tokens of the lending pool were deposited into the recovery account_
 
-### Attack Analysis
+**Attack Analysis**
 
 - The implementation is still vulnerable becuase the lending pool gets the price from a Uniswap pari and it can still be manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
 - An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
 - Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
 
-### POC
+**POC**
 
 See [test/puppet-v2/PuppetV2.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet-v2/PuppetV2.t.sol)
 
@@ -484,7 +484,7 @@ Run `forge test --mp test/puppet-v2/PuppetV2.t.sol --isolate` to validate test
 
 ## 14.PUPPET V3
 
-### Obejctive
+**Obejctive**
 
 _from `_isSolved()`in test_
 
@@ -492,13 +492,13 @@ _from `_isSolved()`in test_
 2. _All tokens of the lending pool were drained_
 3. _All drained tokens from the lending pool were deposited into the recovery account_
 
-### Analysis
+**Attack Analysis**
 
 - The pool has 100 WETH and 100 DVT tokens but it's actually low liquidity. `PuppetV3Pool` calculates the price of DVT tokens using a 10-minute Time-Weighted Average Price (TWAP). This setup makes the contract vulnerable to price manipulation attacks at a low cost. By exploiting this, an attacker could exchange make DVT tokens very cheap.
 - The oracle determines the current price based on data from the past 10 minutes. Because the TWAP period is short, making large trades within this window, such as swapping a large amount of DVT, can significantly manipulate the price.
 - Since TWAP uses delayed pricing, after manipulating the price, there's a brief time window (e.g., 110 seconds) for an attacker to take advantage of the lowered price and execute unfair loans.
 
-### POC
+**POC**
 
 See [test/puppet-v3/PuppetV3.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet-v3/PuppetV3.t.sol)
 
