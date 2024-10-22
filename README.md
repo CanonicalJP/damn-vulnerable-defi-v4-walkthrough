@@ -680,7 +680,7 @@ _from `_isSolved()` in test_
 
 **Attack Analysis**
 
-- The vulnerability resides in the `ClimberTimelock.execute()` function, whihc has an incorrect order of operations. It executes the actions before performing the necessary checks, instead of checking first and then executing. This allows an attacker to bypass the checks and directly modify the contract's state.
+- The vulnerability resides in the `ClimberTimelock.execute()` function, which has an incorrect order of operations. It executes the actions before performing the necessary checks, instead of checking first and then executing. This allows an attacker to bypass the checks and directly modify the contract's state. I.e. using the Check-Effect-Iteration pattern.
 - For an attacker to exploit this vulnerability, they have to follow the below steps:
   1. Call grantRole to acquire the `PROPOSER_ROLE`.
   2. Update `ClimberTimelock.delay` to 0.
