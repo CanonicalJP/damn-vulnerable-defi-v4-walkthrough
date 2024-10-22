@@ -586,7 +586,7 @@ _from `_isSolved()` in test_
 See [test/backdoor/Backdoor.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/backdoor/Backdoor.t.sol)
 
 ```solidity
- function test_backdoor() public checkSolvedByPlayer {
+function test_backdoor() public checkSolvedByPlayer {
     new Attack(
         address(singletonCopy),
         address(walletFactory),
